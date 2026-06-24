@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alan Turing's 114th Birthday - Binary Increment Machine</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    min-height: 100vh;
+    margin: 0;
+  }
+  h1 { margin-bottom: 5px; color: #38bdf8; }
+  .subtitle { color: #94a3b8; margin-bottom: 25px; font-size: 0.95em; }
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  button {
+    background: #38bdf8;
+    color: #0f172a;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.2s;
+  }
+  button:hover { background: #7dd3fc; transform: translateY(-2px); }
+  button:active { transform: translateY(0); }
+  button:disabled { background: #475569; cursor: not-allowed; transform: none; }
+  .speed-control { display: flex; align-items: center; gap: 8px; color: #94a3b8; }
+  input[type="range"] { accent-color: #38bdf8; }
+  
+  .machine-container {
+    background: #1e293b;
+    border-radius: 16px;
+    padding: 30px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  .tape-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 30px;
+    position: relative;
+    height: 100px;
+  }
+  .tape {
+    display: flex;
+    gap: 4px;
+    padding: 10px;
+    background: #0f172a;
+    border-radius: 8px;
+    border: 2px solid #334155;
+  }
+  .cell {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4em;
+    font-weight: bold;
+    background: #1e293b;
+    border: 2px solid #475569;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    color: #cbd5e1;
+  }
+  .cell.active {
+    border-color: #38bdf8;
+    background: #0c4a6e;
+    color: #e0f2fe;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    transform: scale(1.1);
+  }
+  .cell.blank { color: #475569; font-style: italic; }
+  
+  .head {
+    position: absolute;
+    bottom: 0;
+    width: 0; 
+    height: 0; 
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 16px solid #f472b6;
+    transition: left 0.3s ease;
+    transform: translateX(-50%);
+  }
+  .head-label {
+    position: absolute;
+    bottom: 20px;
+    color: #f472b6;
+    font-size: 0.8em;
+    font-weight: bold;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  .info-card {
+    background: #0f172a;
+    padding: 15px;
+    border-radius: 10px;
+    border-left: 4px solid #38bdf8;
+  }
+  .info-card.halt { border-left-color: #f472b6; }
+  .info-card label {
+    display: block;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #94a3b8;
+    margin-bottom: 5px;
+  }
+  .info-card .value {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #f1f5f9;
+  }
+  
+  .rules {
+    background: #0f172a;
+    border-radius: 10px;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    overflow-x: auto;
+  }
+  .rules h3 { margin-top: 0; color: #38bdf8; font-family: sans-serif; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #334155; }
+  th { color: #94a3b8; font-weight: normal; }
+  td { color: #cbd5e1; }
+  .highlight-rule { background: #0c4a6e; animation: pulse 1s; }
+  @keyframes pulse { 0% { background: #0c4a6e; } 100% { background: transparent; } }
+  
+  .description {
+    margin-top: 15px;
+    padding: 12px;
+    background: #0f172a;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 0.9em;
+    line-height: 1.5;
+  }
+  .description strong { color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<h1>🎂 Turing Machine Visualizer</h1>
+<div class="subtitle">Binary Increment — adds 1 to a binary number (e.g., 1011 + 1 = 1100)</div>
+
+<div class="controls">
+  <button id="btn-reset" onclick="resetMachine()">↺ Reset</button>
+  <button id="btn-step" onclick="step()">⏭ Step</button>
+  <button id="btn-auto" onclick="toggleAuto()">▶ Auto Run</button>
+  <div class="speed-control">
+    <span>Speed:</span>
+    <input type="range" id="speed" min="100" max="1500" value="600" style="direction: rtl">
+    <span id="speed-val">600ms</span>
+  </div>
+</div>
+
+<div class="machine-container">
+  <div class="tape-wrapper" id="tape-wrapper">
+    <div class="tape" id="tape"></div>
+    <div class="head" id="head"></div>
+    <div class="head-label" id="head-label">READ/WRITE</div>
+  </div>
+  
+  <div class="info-grid">
+    <div class="info-card" id="card-state">
+      <label>Current State</label>
+      <div class="value" id="state-display">q0 (Seek Right)</div>
+    </div>
+    <div class="info-card" id="card-steps">
+      <label>Steps Taken</label>
+      <div class="value" id="steps-display">0</div>
+    </div>
+    <div class="info-card" id="card-read">
+      <label>Reading Symbol</label>
+      <div class="value" id="read-display">-</div>
+    </div>
+    <div class="info-card" id="card-action">
+      <label>Last Action</label>
+      <div class="value" id="action-display">Ready</div>
+    </div>
+  </div>
+  
+  <div class="rules">
+    <h3>📋 Transition Rules</h3>
+    <table>
+      <thead>
+        <tr><th>State</th><th>Read</th><th>Write</th><th>Move</th><th>Next State</th><th>Meaning</th></tr>
+      </thead>
+      <tbody id="rules-body">
+        <tr id="rule-0"><td>q0</td><td>0 or 1</td><td>keep</td><td>→ Right</td><td>q0</td><td>Find the end of the number</td></tr>
+        <tr id="rule-1"><td>q0</td><td>blank</td><td>blank</td><td>← Left</td><td>q1</td><td>Found end, go back to add</td></tr>
+        <tr id="rule-2"><td>q1</td><td>0</td><td>1</td><td>Stay</td><td>HALT</td><td>Done! Changed 0 to 1</td></tr>
+        <tr id="rule-3"><td>q1</td><td>1</td><td>0</td><td>← Left</td><td>q1</td><td>Carry the 1, flip to 0</td></tr>
+        <tr id="rule-4"><td>q1</td><td>blank</td><td>1</td><td>Stay</td><td>HALT</td><td>Overflow! Write new 1</td></tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="description" id="description">
+    <strong>How it works:</strong> The machine starts at the leftmost bit and scans right until it finds the end of the number. Then it moves left, flipping 1s to 0s (carry) until it finds a 0, which it flips to 1. If it hits a blank, it writes a 1 (overflow). This is exactly how you add 1 in binary!
+  </div>
+</div>
+
+<script>
+// Turing Machine Configuration
+const BLANK = 'B';
+const STATES = {
+  q0: 'q0 (Seek Right)',
+  q1: 'q1 (Add/Carry)',
+  HALT: 'HALT'
+};
+
+// Initial tape: binary 1011 (11 in decimal) + 1 = 1100 (12)
+let tape = ['1', '0', '1', '1'];
+let headPos = 0;
+let state = 'q0';
+let steps = 0;
+let autoInterval = null;
+let isRunning = false;
+
+// Transition function: [write, move, nextState]
+// move: -1 = Left, 0 = Stay, 1 = Right
+const transitions = {
+  q0: {
+    '0': { write: '0', move: 1, next: 'q0', desc: 'Scan right over 0', ruleId: 'rule-0' },
+    '1': { write: '1', move: 1, next: 'q0', desc: 'Scan right over 1', ruleId: 'rule-0' },
+    'B': { write: 'B', move: -1, next: 'q1', desc: 'Found end, turn around', ruleId: 'rule-1' }
+  },
+  q1: {
+    '0': { write: '1', move: 0, next: 'HALT', desc: 'Flip 0→1, DONE!', ruleId: 'rule-2' },
+    '1': { write: '0', move: -1, next: 'q1', desc: 'Flip 1→0, carry left', ruleId: 'rule-3' },
+    'B': { write: '1', move: 0, next: 'HALT', desc: 'Overflow! Write 1', ruleId: 'rule-4' }
+  }
+};
+
+function render() {
+  const tapeEl = document.getElementById('tape');
+  const headEl = document.getElementById('head');
+  const headLabel = document.getElementById('head-label');
+  
+  // Clear and rebuild tape cells
+  tapeEl.innerHTML = '';
+  
+  // Show a window of 11 cells centered on head (or as many as fit)
+  const windowSize = 11;
+  const halfWindow = Math.floor(windowSize / 2);
+  let startIdx = Math.max(0, headPos - halfWindow);
+  let endIdx = Math.min(tape.length - 1, headPos + halfWindow);
+  
+  // Extend tape if needed
+  while (headPos >= tape.length) tape.push(BLANK);
+  if (headPos < 0) {
+    tape.unshift(BLANK);
+    headPos = 0;
+  }
+  
+  // Adjust window for edge cases
+  if (headPos < halfWindow) {
+    startIdx = 0;
+    endIdx = Math.min(windowSize - 1, tape.length - 1);
+  }
+  
+  for (let i = startIdx; i <= endIdx; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    if (i === headPos) cell.classList.add('active');
+    if (tape[i] === BLANK) {
+      cell.textContent = '∅';
+      cell.classList.add('blank');
+    } else {
+      cell.textContent = tape[i];
+    }
+    tapeEl.appendChild(cell);
+  }
+  
+  // Position head indicator
+  const cells = tapeEl.querySelectorAll('.cell');
+  const activeCell = cells[headPos - startIdx];
+  if (activeCell) {
+    const rect = activeCell.getBoundingClientRect();
+    const wrapperRect = document.getElementById('tape-wrapper').getBoundingClientRect();
+    const center = rect.left + rect.width / 2 - wrapperRect.left;
+    headEl.style.left = center + 'px';
+    headLabel.style.left = center + 'px';
+  }
+  
+  // Update info
+  document.getElementById('state-display').textContent = STATES[state] || state;
+  document.getElementById('steps-display').textContent = steps;
+  document.getElementById('read-display').textContent = tape[headPos] === BLANK ? 'blank' : tape[headPos];
+  
+  // Highlight rule
+  document.querySelectorAll('.rules tr').forEach(r => r.style.background = '');
+  if (state !== 'HALT' && transitions[state] && transitions[state][tape[headPos]]) {
+    const ruleId = transitions[state][tape[headPos]].ruleId;
+    const ruleRow = document.getElementById(ruleId);
+    if (ruleRow) ruleRow.style.background = '#0c4a6e';
+  }
+  
+  // Halt styling
+  const stateCard = document.getElementById('card-state');
+  if (state === 'HALT') {
+    stateCard.classList.add('halt');
+    document.getElementById('action-display').textContent = '✅ HALTED';
+    document.getElementById('btn-step').disabled = true;
+    document.getElementById('btn-auto').disabled = true;
+    stopAuto();
+  }
+}
+
+function step() {
+  if (state === 'HALT') return;
+  
+  const symbol = tape[headPos] || BLANK;
+  const trans = transitions[state]?.[symbol];
+  
+  if (!trans) {
+    document.getElementById('action-display').textContent = '❌ No rule! Halting.';
+    state = 'HALT';
+    render();
+    return;
+  }
+  
+  // Execute transition
+  tape[headPos] = trans.write;
+  headPos += trans.move;
+  state = trans.next;
+  steps++;
+  
+  // Ensure tape bounds
+  if (headPos < 0) {
+    tape.unshift(BLANK);
+    headPos = 0;
+  }
+  while (headPos >= tape.length) tape.push(BLANK);
+  
+  document.getElementById('action-display').textContent = trans.desc;
+  render();
+}
+
+function resetMachine() {
+  stopAuto();
+  tape = ['1', '0', '1', '1'];
+  headPos = 0;
+  state = 'q0';
+  steps = 0;
+  document.getElementById('action-display').textContent = 'Ready';
+  document.getElementById('btn-step').disabled = false;
+  document.getElementById('btn-auto').disabled = false;
+  document.getElementById('card-state').classList.remove('halt');
+  render();
+}
+
+function toggleAuto() {
+  const btn = document.getElementById('btn-auto');
+  if (autoInterval) {
+    stopAuto();
+    btn.textContent = '▶ Auto Run';
+  } else {
+    if (state === 'HALT') return;
+    isRunning = true;
+    btn.textContent = '⏸ Pause';
+    doAutoStep();
+  }
+}
+
+function doAutoStep() {
+  if (!isRunning || state === 'HALT') {
+    stopAuto();
+    return;
+  }
+  step();
+  const speed = parseInt(document.getElementById('speed').value);
+  autoInterval = setTimeout(doAutoStep, speed);
+}
+
+function stopAuto() {
+  isRunning = false;
+  clearTimeout(autoInterval);
+  autoInterval = null;
+  document.getElementById('btn-auto').textContent = '▶ Auto Run';
+}
+
+// Speed slider
+document.getElementById('speed').addEventListener('input', (e) => {
+  document.getElementById('speed-val').textContent = e.target.value + 'ms';
+});
+
+// Initial render
+render();
+</script>
+
+</body>
+</html>
